@@ -3,6 +3,10 @@ The bot's one and only trick: whenever a message contains the letters
 "rap" in a row, anywhere, in any word (case-insensitive) - "rap", "wrap",
 "grape", "scraps", all of it - reply with "rip".
 
+It also joins in: when someone else says "rip" (as its own word - "rip",
+"RIP", "rip bro", "R.I.P." - but not "trip" or "script"), it says "rip" too.
+It never answers other bots, including itself, so it can't loop.
+
 Restricted to specific channels via the RAPTOR_CHANNEL_IDS env var
 (comma-separated channel IDs). If that's not set, it responds anywhere it
 can see messages.
@@ -10,6 +14,7 @@ can see messages.
 
 import logging
 import os
+import re
 
 import discord
 from discord.ext import commands
@@ -18,6 +23,14 @@ log = logging.getLogger("raptor.trigger")
 
 TRIGGER = "rap"
 REPLY = "rip"
+
+# "rip" as a word of its own, dots allowed: rip, RIP, r.i.p, R.I.P.
+RIP_PATTERN = re.compile(r"(?<![a-z0-9])r\.?i\.?p\.?(?![a-z0-9])", re.IGNORECASE)
+
+
+def should_reply(content: str) -> bool:
+    text = (content or "").lower()
+    return TRIGGER in text or bool(RIP_PATTERN.search(text))
 
 
 def _parse_channel_ids(env_value: str | None):
@@ -45,8 +58,7 @@ class Raptor(commands.Cog):
         if self.allowed_channel_ids and message.channel.id not in self.allowed_channel_ids:
             return
 
-        content = (message.content or "").lower()
-        if TRIGGER not in content:
+        if not should_reply(message.content):
             return
 
         try:
